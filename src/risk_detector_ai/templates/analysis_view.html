@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Análise - {{ filename }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">Análise: {{ filename }}</h4>
+      <small class="text-muted">Total jogadores: {{ total }}</small>
+    </div>
+    <div>
+      <a class="btn btn-secondary" href="{{ url_for('list_analyses') }}">Voltar</a>
+      <a class="btn btn-primary" href="{{ url_for('uploaded_file', filename=filename) }}">Baixar CSV</a>
+    </div>
+  </div>
+
+  {% if results and results|length > 0 %}
+    <div class="table-responsive">
+      <table class="table table-dark table-hover">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Risk Score</th>
+            <th>Avg Stake</th>
+            <th>Win Rate</th>
+            <th>Motivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+            <tr>
+              <td>{{ r.id }}</td>
+              <td class="text-danger">{{ '%.3f'|format(r.risk_score) }}</td>
+              <td>{{ r.avg_stake|default('-') }}</td>
+              <td>{{ r.win_rate|default('-') }}</td>
+              <td>
+                {% for m in r.reasons %}
+                  <span class="badge bg-secondary text-dark me-1">{{ m }}</span>
+                {% endfor %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="alert alert-secondary">Nenhum jogador encontrado nesta análise.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block title %}Análise Detalhada de Risco{% endblock %}
+
+{% block content %}
+<style>
+  .risk-badge { padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 0.95rem; }
+  .risk-critical { background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%); color: white; }
+  .risk-high { background: linear-gradient(135deg, #ffa94d 0%, #ff922b 100%); color: white; }
+  .risk-medium { background: linear-gradient(135deg, #ffd93d 0%, #f4c430 100%); color: #000; }
+  .risk-low { background: linear-gradient(135deg, #51cf66 0%, #2d6a4f 100%); color: white; }
+  
+  .metric-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .metric-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(61, 220, 132, 0.15); }
+  
+  .stat-value { font-size: 2.2rem; font-weight: 700; letter-spacing: -1px; }
+  .stat-label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  
+  .chart-container { position: relative; height: 300px; margin-bottom: 20px; }
+  .filter-section { background: rgba(61, 220, 132, 0.05); border: 1px solid rgba(61, 220, 132, 0.2); padding: 20px; border-radius: 8px; }
+  
+  .player-row { transition: background 0.2s; }
+  .player-row:hover { background: rgba(61, 220, 132, 0.08) !important; }
+  .player-row.critical { border-left: 4px solid #ff6b6b; }
+  .player-row.high { border-left: 4px solid #ffa94d; }
+  .player-row.medium { border-left: 4px solid #ffd93d; }
+  .player-row.low { border-left: 4px solid #51cf66; }
+  
+  .export-btn { gap: 10px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }
+  
+  .breadcrumb-link { color: #3ddc84; cursor: pointer; text-decoration: none; }
+  .breadcrumb-link:hover { text-decoration: underline; }
+</style>
+
+<div class="container-fluid mt-4">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 style="margin: 0; font-size: 2rem;">📊 Análise de Risco de Jogadores</h1>
+      <p style="margin: 8px 0 0 0; color: #a0a0a0;">Arquivo: <span class="text-primary">{{ filename }}</span></p>
+    </div>
+    <div class="export-btn d-flex">
+      <a class="btn btn-primary" href="/uploads/{{ filename }}" download>
+        <i class="fas fa-download"></i> Exportar CSV
+      </a>
+      <a class="btn btn-secondary" href="/upload">
+        <i class="fas fa-plus"></i> Nova Análise
+      </a>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="stat-grid">
+    <div class="card metric-card" style="border: 1px solid rgba(61, 220, 132, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">👥 Total de Jogadores</div>
+        <div class="stat-value text-primary">{{ rows|length }}</div>
+      </div>
+    </div>
+
+    <div class="card metric-card" style="border: 1px solid rgba(255, 107, 107, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">🚨 Risco Crítico (≥0.8)</div>
+        <div class="stat-value" style="color: #ff6b6b;" id="critical-count">0</div>
+      </div>
+    </div>
+
+    <div class="card metric-card" style="border: 1px solid rgba(255, 154, 158, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">⚠️ Risco Alto (0.6-0.79)</div>
+        <div class="stat-value" style="color: #ffa94d;" id="high-count">0</div>
+      </div>
+    </div>
+
+    <div class="card metric-card" style="border: 1px solid rgba(255, 217, 61, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">⚡ Risco Médio (0.4-0.59)</div>
+        <div class="stat-value" style="color: #ffd93d;" id="medium-count">0</div>
+      </div>
+    </div>
+
+    <div class="card metric-card" style="border: 1px solid rgba(81, 207, 102, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">✅ Risco Baixo (&lt;0.4)</div>
+        <div class="stat-value" style="color: #51cf66;" id="low-count">0</div>
+      </div>
+    </div>
+
+    <div class="card metric-card" style="border: 1px solid rgba(61, 220, 132, 0.3);">
+      <div class="card-body" style="padding: 20px;">
+        <div class="stat-label text-muted">📈 Score Médio</div>
+        <div class="stat-value text-info" id="avg-score">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="card mb-4" style="border: 1px solid rgba(61, 220, 132, 0.2);">
+    <div class="card-body">
+      <h5 class="card-title mb-4">📊 Distribuição de Scores de Risco</h5>
+      <div class="chart-container">
+        <canvas id="riskChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filter-section mb-4">
+    <h6 style="margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+      🔍 Filtros de Análise
+    </h6>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label" for="riskFilter">Nível de Risco Mínimo</label>
+        <select class="form-control" id="riskFilter" onchange="applyFilters()">
+          <option value="0.0">Mostrar Todos (≥ 0.0)</option>
+          <option value="0.4">Risco Médio+ (≥ 0.4)</option>
+          <option value="0.6" selected>Risco Alto+ (≥ 0.6)</option>
+          <option value="0.8">Risco Crítico (≥ 0.8)</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="customThreshold">Filtro Customizado</label>
+        <div class="input-group">
+          <input type="number" class="form-control" id="customThreshold" min="0" max="1" step="0.01" placeholder="0.00">
+          <button class="btn btn-primary" onclick="applyCustomThreshold()">Aplicar</button>
+        </div>
+      </div>
+      <div class="col-md-6 d-flex align-items-end">
+        <button class="btn btn-outline-secondary" onclick="resetFilters()">
+          <i class="fas fa-redo"></i> Resetar Filtros
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de Resultados -->
+  <div class="card mb-4" style="border: 1px solid rgba(61, 220, 132, 0.2);">
+    <div class="card-body">
+      <h5 class="card-title mb-4">📋 Detalhes dos Jogadores</h5>
+      <div class="table-responsive">
+        <table class="table" id="resultsTable" style="margin-bottom: 0;">
+          <thead>
+            <tr style="border-bottom: 2px solid rgba(61, 220, 132, 0.3);">
+              <th style="color: #3ddc84; font-weight: 700;">ID Usuário</th>
+              <th style="color: #3ddc84; font-weight: 700;">Score de Risco</th>
+              <th style="color: #3ddc84; font-weight: 700;">Nível</th>
+              {% for col in cols %}
+                {% if col != 'user_id' and col != 'risk_score' %}
+                  <th style="color: #3ddc84; font-weight: 700;">{{ col }}</th>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            {% for r in rows %}
+              <tr class="player-row" data-score="{{ r.get('risk_score', 0) }}" data-user="{{ r.get('user_id', 'N/A') }}">
+                <td><strong>{{ r.get('user_id', 'N/A') }}</strong></td>
+                <td>
+                  <div class="risk-badge" id="badge-{{ loop.index }}" style="display: inline-block;">
+                    {{ "%.3f"|format(r.get('risk_score', 0)) }}
+                  </div>
+                </td>
+                <td id="level-{{ loop.index }}">-</td>
+                {% for col in cols %}
+                  {% if col != 'user_id' and col != 'risk_score' %}
+                    <td>{{ r[col] if r[col] is not none else '-' }}</td>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const histLabels = {{ hist_labels|tojson }};
+  const histCounts = {{ hist_counts|tojson }};
+  let currentChart = null;
+
+  function getRiskLevel(score) {
+    if (score >= 0.8) return { label: '🚨 Crítico', class: 'risk-critical' };
+    if (score >= 0.6) return { label: '⚠️ Alto', class: 'risk-high' };
+    if (score >= 0.4) return { label: '⚡ Médio', class: 'risk-medium' };
+    return { label: '✅ Baixo', class: 'risk-low' };
+  }
+
+  function updateStats() {
+    const rows = document.querySelectorAll('#resultsTable tbody tr');
+    let stats = { critical: 0, high: 0, medium: 0, low: 0, total: 0, avgScore: 0 };
+
+    rows.forEach((row, idx) => {
+      if (row.style.display !== 'none') {
+        const score = parseFloat(row.dataset.score);
+        stats.total++;
+        stats.avgScore += score;
+
+        if (score >= 0.8) stats.critical++;
+        else if (score >= 0.6) stats.high++;
+        else if (score >= 0.4) stats.medium++;
+        else stats.low++;
+
+        // Update row styling
+        const riskLevel = getRiskLevel(score);
+        row.className = `player-row ${riskLevel.class.split(' ')[0].toLowerCase()}`;
+        document.getElementById(`badge-${idx + 1}`).className = `risk-badge ${riskLevel.class}`;
+        document.getElementById(`badge-${idx + 1}`).innerText = "".padEnd(score > 0.7 ? 2 : 1, '●') + ` ${score.toFixed(3)}`;
+        document.getElementById(`level-${idx + 1}`).innerText = riskLevel.label;
+      }
+    });
+
+    document.getElementById('critical-count').innerText = stats.critical;
+    document.getElementById('high-count').innerText = stats.high;
+    document.getElementById('medium-count').innerText = stats.medium;
+    document.getElementById('low-count').innerText = stats.low;
+    document.getElementById('avg-score').innerText = stats.total > 0 ? (stats.avgScore / stats.total).toFixed(3) : '0.000';
+  }
+
+  function applyFilters() {
+    const threshold = parseFloat(document.getElementById('riskFilter').value);
+    const rows = document.querySelectorAll('#resultsTable tbody tr');
+    rows.forEach(row => {
+      const score = parseFloat(row.dataset.score);
+      row.style.display = score >= threshold ? '' : 'none';
+    });
+    updateStats();
+  }
+
+  function applyCustomThreshold() {
+    const threshold = parseFloat(document.getElementById('customThreshold').value);
+    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+      alert('Por favor, insira um valor entre 0 e 1');
+      return;
+    }
+    const rows = document.querySelectorAll('#resultsTable tbody tr');
+    rows.forEach(row => {
+      const score = parseFloat(row.dataset.score);
+      row.style.display = score >= threshold ? '' : 'none';
+    });
+    updateStats();
+  }
+
+  function resetFilters() {
+    document.getElementById('riskFilter').value = '0.0';
+    document.getElementById('customThreshold').value = '';
+    const rows = document.querySelectorAll('#resultsTable tbody tr');
+    rows.forEach(row => row.style.display = '');
+    updateStats();
+  }
+
+  // Initialize Chart
+  function initChart() {
+    const ctx = document.getElementById('riskChart').getContext('2d');
+    if (currentChart) currentChart.destroy();
+    currentChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: histLabels,
+        datasets: [{
+          label: 'Quantidade de Jogadores',
+          data: histCounts,
+          backgroundColor: [
+            'rgba(81, 207, 102, 0.7)',
+            'rgba(255, 217, 61, 0.7)',
+            'rgba(255, 154, 158, 0.7)',
+            'rgba(255, 107, 107, 0.7)'
+          ],
+          borderColor: ['#51cf66', '#ffd93d', '#ffa94d', '#ff6b6b'],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#e0e0e0', font: { size: 12, weight: 'bold' } } }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#a0a0a0' },
+            grid: { color: 'rgba(61, 220, 132, 0.1)' }
+          },
+          x: {
+            ticks: { color: '#a0a0a0' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', function() {
+    initChart();
+    applyFilters();
+  });
+</script>
+{% endblock %}
