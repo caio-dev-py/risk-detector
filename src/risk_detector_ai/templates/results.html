@@ -50,47 +50,61 @@
     </div>
   </div>
 
-  <!-- KPI Cards -->
+  <!-- KPI Cards - Stats from Backend -->
   <div class="stat-grid">
     <div class="card metric-card" style="border: 1px solid rgba(61, 220, 132, 0.3);">
       <div class="card-body" style="padding: 20px;">
         <div class="stat-label text-muted">👥 Total de Jogadores</div>
-        <div class="stat-value text-primary">{{ rows|length }}</div>
+        <div class="stat-value text-primary">{{ total_players }}</div>
+        <small class="text-muted" style="display: block; margin-top: 8px;">Perfis de risco analisados</small>
       </div>
     </div>
 
     <div class="card metric-card" style="border: 1px solid rgba(255, 107, 107, 0.3);">
       <div class="card-body" style="padding: 20px;">
         <div class="stat-label text-muted">🚨 Risco Crítico (≥0.8)</div>
-        <div class="stat-value" style="color: #ff6b6b;" id="critical-count">0</div>
+        <div class="stat-value" style="color: #ff6b6b;">
+          <span id="critical-count">{{ (rows|selectattr('risk_score', 'ge', 0.8)|list|length) }}</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: #a0a0a0;" id="critical-pct">0%</div>
       </div>
     </div>
 
     <div class="card metric-card" style="border: 1px solid rgba(255, 154, 158, 0.3);">
       <div class="card-body" style="padding: 20px;">
-        <div class="stat-label text-muted">⚠️ Risco Alto (0.6-0.79)</div>
-        <div class="stat-value" style="color: #ffa94d;" id="high-count">0</div>
+        <div class="stat-label text-muted">⚠️ Risco Alto (0.5-0.79)</div>
+        <div class="stat-value" style="color: #ffa94d;">
+          <span id="high-count">{{ (rows|selectattr('risk_score', 'ge', 0.5)|selectattr('risk_score', 'lt', 0.8)|list|length) }}</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: #a0a0a0;" id="high-pct">0%</div>
       </div>
     </div>
 
     <div class="card metric-card" style="border: 1px solid rgba(255, 217, 61, 0.3);">
       <div class="card-body" style="padding: 20px;">
-        <div class="stat-label text-muted">⚡ Risco Médio (0.4-0.59)</div>
-        <div class="stat-value" style="color: #ffd93d;" id="medium-count">0</div>
+        <div class="stat-label text-muted">⚡ Risco Médio (0.3-0.49)</div>
+        <div class="stat-value" style="color: #ffd93d;">
+          <span id="medium-count">{{ (rows|selectattr('risk_score', 'ge', 0.3)|selectattr('risk_score', 'lt', 0.5)|list|length) }}</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: #a0a0a0;" id="medium-pct">0%</div>
       </div>
     </div>
 
     <div class="card metric-card" style="border: 1px solid rgba(81, 207, 102, 0.3);">
       <div class="card-body" style="padding: 20px;">
-        <div class="stat-label text-muted">✅ Risco Baixo (&lt;0.4)</div>
-        <div class="stat-value" style="color: #51cf66;" id="low-count">0</div>
+        <div class="stat-label text-muted">✅ Risco Baixo (&lt;0.3)</div>
+        <div class="stat-value" style="color: #51cf66;">
+          <span id="low-count">{{ (rows|selectattr('risk_score', 'lt', 0.3)|list|length) }}</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: #a0a0a0;" id="low-pct">0%</div>
       </div>
     </div>
 
     <div class="card metric-card" style="border: 1px solid rgba(61, 220, 132, 0.3);">
       <div class="card-body" style="padding: 20px;">
         <div class="stat-label text-muted">📈 Score Médio</div>
-        <div class="stat-value text-info" id="avg-score">0.00</div>
+        <div class="stat-value text-info">{{ "%.3f"|format(avg_risk) }}</div>
+        <small class="text-muted" style="display: block; margin-top: 8px;">Risco geral da carteira</small>
       </div>
     </div>
   </div>
@@ -105,73 +119,129 @@
     </div>
   </div>
 
-  <!-- Filtros -->
+  <!-- Filtros e Busca -->
   <div class="filter-section mb-4">
     <h6 style="margin-top: 0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
       🔍 Filtros de Análise
     </h6>
     <div class="row g-3">
-      <div class="col-md-3">
-        <label class="form-label" for="riskFilter">Nível de Risco Mínimo</label>
+      <div class="col-md-2">
+        <label class="form-label" for="riskFilter">Filtro Rápido</label>
         <select class="form-control" id="riskFilter" onchange="applyFilters()">
-          <option value="0.0">Mostrar Todos (≥ 0.0)</option>
-          <option value="0.4">Risco Médio+ (≥ 0.4)</option>
-          <option value="0.6" selected>Risco Alto+ (≥ 0.6)</option>
-          <option value="0.8">Risco Crítico (≥ 0.8)</option>
+          <option value="0.0">📊 Todos</option>
+          <option value="0.3">⚡ Médio+</option>
+          <option value="0.5" selected>⚠️ Alto+</option>
+          <option value="0.8">🚨 Crítico</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="sortBy">Ordenar Por</label>
+        <select class="form-control" id="sortBy" onchange="applySorting()">
+          <option value="score_desc" selected>Risco (Alto→Baixo)</option>
+          <option value="score_asc">Risco (Baixo→Alto)</option>
+          <option value="user_asc">ID Usuário (A→Z)</option>
+          <option value="user_desc">ID Usuário (Z→A)</option>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label" for="customThreshold">Filtro Customizado</label>
+        <label class="form-label" for="userSearch">Buscar por ID Usuário</label>
+        <input type="text" class="form-control" id="userSearch" placeholder="Ex: 12345" onkeyup="filterByUser()">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="customThreshold">Score Mínimo</label>
         <div class="input-group">
-          <input type="number" class="form-control" id="customThreshold" min="0" max="1" step="0.01" placeholder="0.00">
-          <button class="btn btn-primary" onclick="applyCustomThreshold()">Aplicar</button>
+          <input type="number" class="form-control" id="customThreshold" min="0" max="1" step="0.01" placeholder="0.00" onchange="applyCustomThreshold()">
+          <button class="btn btn-sm btn-primary" onclick="applyCustomThreshold()">Aplicar</button>
         </div>
       </div>
-      <div class="col-md-6 d-flex align-items-end">
-        <button class="btn btn-outline-secondary" onclick="resetFilters()">
-          <i class="fas fa-redo"></i> Resetar Filtros
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-outline-secondary w-100" onclick="resetFilters()">
+          <i class="fas fa-redo"></i> Resetar
         </button>
       </div>
     </div>
   </div>
 
+  <!-- Resumo dos Filtros Aplicados -->
+  <div class="alert alert-info mb-3" id="filterSummary" style="display: none;">
+    Filtrando: <span id="filterText"></span> 
+    <button class="btn btn-link btn-sm" onclick="resetFilters()" style="text-decoration: none;">Limpar filtros</button>
+  </div>
+
   <!-- Tabela de Resultados -->
   <div class="card mb-4" style="border: 1px solid rgba(61, 220, 132, 0.2);">
     <div class="card-body">
-      <h5 class="card-title mb-4">📋 Detalhes dos Jogadores</h5>
-      <div class="table-responsive">
-        <table class="table" id="resultsTable" style="margin-bottom: 0;">
-          <thead>
+      <h5 class="card-title mb-4">📋 Detalhes dos Jogadores (<span id="rowCount">{{ rows|length }}</span>)</h5>
+      <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+        <table class="table table-sm table-hover" id="resultsTable" style="margin-bottom: 0;">
+          <thead style="position: sticky; top: 0; background: #1a1a1a; z-index: 10;">
             <tr style="border-bottom: 2px solid rgba(61, 220, 132, 0.3);">
-              <th style="color: #3ddc84; font-weight: 700;">ID Usuário</th>
-              <th style="color: #3ddc84; font-weight: 700;">Score de Risco</th>
-              <th style="color: #3ddc84; font-weight: 700;">Nível</th>
-              {% for col in cols %}
-                {% if col != 'user_id' and col != 'risk_score' %}
-                  <th style="color: #3ddc84; font-weight: 700;">{{ col }}</th>
-                {% endif %}
-              {% endfor %}
+              <th style="color: #3ddc84; font-weight: 700; width: 20%;">👤 ID Usuário</th>
+              <th style="color: #3ddc84; font-weight: 700; width: 20%; text-align: center;">🎯 Score de Risco</th>
+              <th style="color: #3ddc84; font-weight: 700; width: 15%; text-align: center;">📊 Nível</th>
+              {% if cols|length > 2 %}
+                {% for col in cols %}
+                  {% if col != 'user_id' and col != 'risk_score' %}
+                    <th style="color: #3ddc84; font-weight: 700;">{{ col|replace('_', ' ')|title }}</th>
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
             </tr>
           </thead>
           <tbody id="tableBody">
             {% for r in rows %}
-              <tr class="player-row" data-score="{{ r.get('risk_score', 0) }}" data-user="{{ r.get('user_id', 'N/A') }}">
-                <td><strong>{{ r.get('user_id', 'N/A') }}</strong></td>
-                <td>
-                  <div class="risk-badge" id="badge-{{ loop.index }}" style="display: inline-block;">
-                    {{ "%.3f"|format(r.get('risk_score', 0)) }}
-                  </div>
+              {% set risk_score = r.get('risk_score', 0)|float %}
+              {% if risk_score >= 0.8 %}
+                {% set row_color = 'rgba(255, 107, 107, 0.15)' %}
+                {% set border_left = '4px solid #ff6b6b' %}
+              {% elif risk_score >= 0.5 %}
+                {% set row_color = 'rgba(255, 154, 158, 0.15)' %}
+                {% set border_left = '4px solid #ffa94d' %}
+              {% elif risk_score >= 0.3 %}
+                {% set row_color = 'rgba(255, 217, 61, 0.15)' %}
+                {% set border_left = '4px solid #ffd93d' %}
+              {% else %}
+                {% set row_color = 'rgba(81, 207, 102, 0.1)' %}
+                {% set border_left = '4px solid #51cf66' %}
+              {% endif %}
+              <tr class="player-row" data-score="{{ risk_score }}" data-user="{{ r.get('user_id', 'N/A') }}" 
+                  style="background-color: {{ row_color }}; border-left: {{ border_left }};">
+                <td style="padding: 10px 8px;">
+                  <strong style="color: #3ddc84;">{{ r.get('user_id', 'N/A') }}</strong>
                 </td>
-                <td id="level-{{ loop.index }}">-</td>
-                {% for col in cols %}
-                  {% if col != 'user_id' and col != 'risk_score' %}
-                    <td>{{ r[col] if r[col] is not none else '-' }}</td>
+                <td style="padding: 10px 8px; text-align: center;">
+                  <span style="background-color: rgba(61, 220, 132, 0.2); padding: 4px 8px; border-radius: 4px; font-weight: 600; color: #e0e0e0;">
+                    {{ "%.3f"|format(risk_score) }}
+                  </span>
+                </td>
+                <td style="padding: 10px 8px; text-align: center; font-weight: 600;">
+                  {% if risk_score >= 0.8 %}
+                    <span style="color: #ff6b6b;">🚨 Crítico</span>
+                  {% elif risk_score >= 0.5 %}
+                    <span style="color: #ffa94d;">⚠️ Alto</span>
+                  {% elif risk_score >= 0.3 %}
+                    <span style="color: #ffd93d;">⚡ Médio</span>
+                  {% else %}
+                    <span style="color: #045a12;">✅ Baixo</span>
                   {% endif %}
-                {% endfor %}
+                </td>
+                {% if cols|length > 2 %}
+                  {% for col in cols %}
+                    {% if col != 'user_id' and col != 'risk_score' %}
+                      <td style="padding: 10px 8px; font-size: 0.9em; color: #c0c0c0;">
+                        {{ r[col] if r[col] is not none else '-' }}
+                      </td>
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
               </tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div style="padding: 12px; background: rgba(61, 220, 132, 0.05); border-top: 1px solid rgba(61, 220, 132, 0.2); margin-top: 12px; font-size: 0.9em; color: #a0a0a0;">
+        <strong>Total:</strong> <span id="rowCount">{{ rows|length }}</span> jogadores | 
+        <strong>Exibindo:</strong> <span id="visibleCount">{{ rows|length }}</span>
       </div>
     </div>
   </div>
@@ -179,106 +249,208 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const histLabels = {{ hist_labels|tojson }};
-  const histCounts = {{ hist_counts|tojson }};
+  // Dados históricos para preservar estado
+  let originalRows = [];
+  let currentFilter = { riskLevel: 0.5, customThreshold: null, userSearch: '', sortBy: 'score_desc' };
+  let histLabels = {{ hist_labels|tojson }};
+  let histCounts = {{ hist_counts|tojson }};
   let currentChart = null;
 
   function getRiskLevel(score) {
-    if (score >= 0.8) return { label: '🚨 Crítico', class: 'risk-critical' };
-    if (score >= 0.6) return { label: '⚠️ Alto', class: 'risk-high' };
-    if (score >= 0.4) return { label: '⚡ Médio', class: 'risk-medium' };
-    return { label: '✅ Baixo', class: 'risk-low' };
+    if (score >= 0.8) return { label: '🚨 Crítico', class: 'risk-critical', color: '#ff6b6b' };
+    if (score >= 0.5) return { label: '⚠️ Alto', class: 'risk-high', color: '#ffa94d' };
+    if (score >= 0.3) return { label: '⚡ Médio', class: 'risk-medium', color: '#ffd93d' };
+    return { label: '✅ Baixo', class: 'risk-low', color: '#51cf66' };
+  }
+
+  function formatScore(score) {
+    score = parseFloat(score) || 0;
+    let risk = getRiskLevel(score);
+    let dots = score >= 0.8 ? '●●●' : score >= 0.5 ? '●●' : score >= 0.3 ? '●' : '○';
+    return `<span class="risk-badge ${risk.class}" style="background-color: ${risk.color}30; border: 1px solid ${risk.color}; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${dots} ${score.toFixed(3)}</span>`;
   }
 
   function updateStats() {
     const rows = document.querySelectorAll('#resultsTable tbody tr');
-    let stats = { critical: 0, high: 0, medium: 0, low: 0, total: 0, avgScore: 0 };
+    let stats = { critical: 0, high: 0, medium: 0, low: 0, total: 0, avgScore: 0, visibleCount: 0 };
 
     rows.forEach((row, idx) => {
       if (row.style.display !== 'none') {
         const score = parseFloat(row.dataset.score);
         stats.total++;
         stats.avgScore += score;
+        stats.visibleCount++;
 
         if (score >= 0.8) stats.critical++;
-        else if (score >= 0.6) stats.high++;
-        else if (score >= 0.4) stats.medium++;
+        else if (score >= 0.5) stats.high++;
+        else if (score >= 0.3) stats.medium++;
         else stats.low++;
 
-        // Update row styling
-        const riskLevel = getRiskLevel(score);
-        row.className = `player-row ${riskLevel.class.split(' ')[0].toLowerCase()}`;
-        document.getElementById(`badge-${idx + 1}`).className = `risk-badge ${riskLevel.class}`;
-        document.getElementById(`badge-${idx + 1}`).innerText = "".padEnd(score > 0.7 ? 2 : 1, '●') + ` ${score.toFixed(3)}`;
-        document.getElementById(`level-${idx + 1}`).innerText = riskLevel.label;
+        // Atualizar estilo da linha
+        let risk = getRiskLevel(score);
+        row.className = `player-row ${risk.class}`;
       }
     });
 
+    // Atualizar badges
     document.getElementById('critical-count').innerText = stats.critical;
     document.getElementById('high-count').innerText = stats.high;
     document.getElementById('medium-count').innerText = stats.medium;
     document.getElementById('low-count').innerText = stats.low;
-    document.getElementById('avg-score').innerText = stats.total > 0 ? (stats.avgScore / stats.total).toFixed(3) : '0.000';
+
+    // Atualizar percentuais
+    if (stats.total > 0) {
+      document.getElementById('critical-pct').innerText = ((stats.critical / {{ total_players }}) * 100).toFixed(1) + '%';
+      document.getElementById('high-pct').innerText = ((stats.high / {{ total_players }}) * 100).toFixed(1) + '%';
+      document.getElementById('medium-pct').innerText = ((stats.medium / {{ total_players }}) * 100).toFixed(1) + '%';
+      document.getElementById('low-pct').innerText = ((stats.low / {{ total_players }}) * 100).toFixed(1) + '%';
+    }
+
+    // Atualizar contador de linhas
+    document.getElementById('visibleCount').innerText = stats.visibleCount;
   }
 
   function applyFilters() {
-    const threshold = parseFloat(document.getElementById('riskFilter').value);
-    const rows = document.querySelectorAll('#resultsTable tbody tr');
-    rows.forEach(row => {
-      const score = parseFloat(row.dataset.score);
-      row.style.display = score >= threshold ? '' : 'none';
-    });
-    updateStats();
+    currentFilter.riskLevel = parseFloat(document.getElementById('riskFilter').value);
+    applyAllFilters();
+  }
+
+  function filterByUser() {
+    currentFilter.userSearch = document.getElementById('userSearch').value.trim().toLowerCase();
+    applyAllFilters();
   }
 
   function applyCustomThreshold() {
-    const threshold = parseFloat(document.getElementById('customThreshold').value);
-    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+    const val = document.getElementById('customThreshold').value;
+    currentFilter.customThreshold = val ? parseFloat(val) : null;
+    if (currentFilter.customThreshold !== null && (isNaN(currentFilter.customThreshold) || currentFilter.customThreshold < 0 || currentFilter.customThreshold > 1)) {
       alert('Por favor, insira um valor entre 0 e 1');
       return;
     }
+    document.getElementById('riskFilter').value = '0.0';
+    applyAllFilters();
+  }
+
+  function applySorting() {
+    currentFilter.sortBy = document.getElementById('sortBy').value;
+    applySortToVisibleRows();
+  }
+
+  function applySortToVisibleRows() {
+    const tableBody = document.getElementById('tableBody');
+    const rows = Array.from(tableBody.querySelectorAll('tr')).filter(row => row.style.display !== 'none');
+    
+    rows.sort((a, b) => {
+      const scoreA = parseFloat(a.dataset.score);
+      const scoreB = parseFloat(b.dataset.score);
+      const userA = a.dataset.user.toString().toLowerCase();
+      const userB = b.dataset.user.toString().toLowerCase();
+
+      switch(currentFilter.sortBy) {
+        case 'score_asc': return scoreA - scoreB;
+        case 'score_desc': return scoreB - scoreA;
+        case 'user_asc': return userA.localeCompare(userB);
+        case 'user_desc': return userB.localeCompare(userA);
+        default: return scoreB - scoreA;
+      }
+    });
+
+    rows.forEach(row => tableBody.appendChild(row));
+  }
+
+  function applyAllFilters() {
     const rows = document.querySelectorAll('#resultsTable tbody tr');
+    let visibleCount = 0;
+    let filterText = [];
+
     rows.forEach(row => {
       const score = parseFloat(row.dataset.score);
-      row.style.display = score >= threshold ? '' : 'none';
+      const user = row.dataset.user.toString().toLowerCase();
+
+      let show = true;
+
+      // Aplicar threshold customizado ou filtro de risco
+      if (currentFilter.customThreshold !== null) {
+        show = show && score >= currentFilter.customThreshold;
+        if (!filterText.includes(`Score ≥ ${currentFilter.customThreshold}`)) {
+          filterText.push(`Score ≥ ${currentFilter.customThreshold}`);
+        }
+      } else {
+        show = show && score >= currentFilter.riskLevel;
+        if (currentFilter.riskLevel > 0) {
+          let riskLabel = currentFilter.riskLevel >= 0.8 ? 'Crítico' : 
+                         currentFilter.riskLevel >= 0.5 ? 'Alto' : 
+                         currentFilter.riskLevel >= 0.3 ? 'Médio' : 'Todos';
+          if (!filterText.includes(`Risco: ${riskLabel}`)) {
+            filterText.push(`Risco: ${riskLabel}`);
+          }
+        }
+      }
+
+      // Filtro de busca por usuário
+      if (currentFilter.userSearch) {
+        show = show && user.includes(currentFilter.userSearch);
+        if (!filterText.includes(`ID: "${currentFilter.userSearch}"`)) {
+          filterText.push(`ID: "${currentFilter.userSearch}"`);
+        }
+      }
+
+      row.style.display = show ? '' : 'none';
+      if (show) visibleCount++;
     });
+
+    // Atualizar summary
+    const summary = document.getElementById('filterSummary');
+    if (visibleCount < {{ total_players }} || filterText.length > 0) {
+      document.getElementById('filterText').innerText = filterText.length > 0 ? filterText.join(' | ') : `${visibleCount} de {{ total_players }} jogadores`;
+      summary.style.display = 'block';
+    } else {
+      summary.style.display = 'none';
+    }
+
+    applySortToVisibleRows();
     updateStats();
   }
 
   function resetFilters() {
     document.getElementById('riskFilter').value = '0.0';
     document.getElementById('customThreshold').value = '';
+    document.getElementById('userSearch').value = '';
+    document.getElementById('sortBy').value = 'score_desc';
+    currentFilter = { riskLevel: 0.0, customThreshold: null, userSearch: '', sortBy: 'score_desc' };
+    
     const rows = document.querySelectorAll('#resultsTable tbody tr');
     rows.forEach(row => row.style.display = '');
+    
+    document.getElementById('filterSummary').style.display = 'none';
+    applySortToVisibleRows();
     updateStats();
   }
 
-  // Initialize Chart
+  // Inicializar Chart.js
   function initChart() {
     const ctx = document.getElementById('riskChart').getContext('2d');
     if (currentChart) currentChart.destroy();
+    
     currentChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: histLabels,
+        labels: histLabels.map(l => l.toFixed(2)),
         datasets: [{
           label: 'Quantidade de Jogadores',
           data: histCounts,
-          backgroundColor: [
-            'rgba(81, 207, 102, 0.7)',
-            'rgba(255, 217, 61, 0.7)',
-            'rgba(255, 154, 158, 0.7)',
-            'rgba(255, 107, 107, 0.7)'
-          ],
-          borderColor: ['#51cf66', '#ffd93d', '#ffa94d', '#ff6b6b'],
-          borderWidth: 2
+          backgroundColor: 'rgba(61, 220, 132, 0.7)',
+          borderColor: '#3ddc84',
+          borderWidth: 2,
+          borderRadius: 4
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#e0e0e0', font: { size: 12, weight: 'bold' } } }
+          legend: { labels: { color: '#e0e0e0', font: { size: 12, weight: 'bold' } } },
+          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#3ddc84', bodyColor: '#e0e0e0' }
         },
         scales: {
           y: {
@@ -295,10 +467,10 @@
     });
   }
 
-  // Initial load
+  // Inicialização ao carregar
   document.addEventListener('DOMContentLoaded', function() {
     initChart();
-    applyFilters();
+    applyAllFilters();
   });
 </script>
 {% endblock %}

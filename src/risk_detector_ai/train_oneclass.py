@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
-DATA_PATH = os.path.join(BASEDIR, 'data_treino', 'dados_completos.csv')
+DATA_PATH = os.path.join(BASEDIR, 'data', 'data_treino', 'dados_completos.csv')
 MODEL_DIR = os.path.join(BASEDIR, 'ml_models')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
